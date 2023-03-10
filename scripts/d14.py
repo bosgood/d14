@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import json
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 import argparse
 from pprint import pprint
 
@@ -29,33 +29,60 @@ def firestorm_get(endpoint):
     return content
 
 
-def pixelblaze_post(endpoint, body):
+def pixelblaze_post(endpoint, data):
     """
     Makes a POST request to Firestorm
     @param endpoint: name of Firestorm endpoint
-    @param body: POST request content
+    @param data: POST request content body
     @return JSON-decoded response body
     """
-    pass
+    req = Request(f"http://{FIRESTORM_ADDRESS}/{endpoint}",
+                  data=data,
+                  headers={'Content-Type': 'application/json'},
+                  method="POST")
+    # TODO need to finish POST implementation
+    import ipdb
+    ipdb.set_trace()
 
 
 def discover():
+    """
+    Discovers all Pixelblaze nodes on the network
+    @return List of Pixelblaze infos
+    """
     nodes = firestorm_get("discover")
     return nodes
+
+
+def deploy(from_node, to_nodes):
+    # TODO need to establish target list to populate data
+    # curl -v -X POST -H 'Content-Type: application/json' -d '{"from": 811451, "to": [4514378, 8703982, 9987259, 9999035, 12327866, 14165434, 15792826, 16266426]}' http://192.168.5.1/clonePrograms
+    data = {}
+    resp = pixelblaze_post("clonePrograms", data)
+    # TODO need to run /clonePrograms again and view response body
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Control the D14 sign")
     parser.add_argument('command', type=str, help='Command to run')
+
+    g_deployment = parser.add_argument_group(
+        'deployment', 'pattern deployment options')
+    g_deployment.add_argument('--source', 'node to copy patterns from')
+    g_deployment.add_argument(
+        '--dest', 'node(s) to copy patterns to (empty => all)')
+
     args = parser.parse_args()
 
+    # Subcommand selection
     if args.command == 'discover':
         nodes = discover()
         pprint(nodes)
-
     elif args.command == 'deploy':
-        pass
+        # TODO need argument parsing here so targets can be specified in user-friendly ways
+        result = deploy(args.source, args.dest)
+        pprint(result)
 
 
 if __name__ == "__main__":
