@@ -40,9 +40,14 @@ def firestorm_post(endpoint, data):
                   data=data,
                   headers={'Content-Type': 'application/json'},
                   method="POST")
+    resp = urlopen(req)
+    body = resp.readlines()
+
     # TODO need to finish POST implementation
     import ipdb
     ipdb.set_trace()
+
+    return body
 
 
 def discover():
@@ -52,6 +57,31 @@ def discover():
     """
     nodes = firestorm_get("discover")
     return nodes
+
+
+def command(cmd, targets):
+    """
+    Sends a command message to a set of nodes
+    @param cmd: command name
+    @param targets: Pixelblaze IDs
+    @return command response body
+    """
+
+    # {
+    #   "command": {
+    #     "programName": "blink fade"
+    #   },
+    #   "ids": [
+    #     6909667,
+    #     9398311
+    #   ]
+    # }
+
+    resp = firestorm_post("command", {
+        'command': cmd,
+        'ids': targets,
+    })
+    return resp
 
 
 def deploy(from_node, to_nodes):
@@ -67,6 +97,12 @@ def main():
         description="Control the D14 sign")
     parser.add_argument('command', type=str, help='Command to run')
 
+    g_command = parser.add_argument_group(
+        'command', 'command options'
+    )
+    g_command.add_argument(
+        '--targets', help='node(s) to send command to', default=[], nargs='*')
+
     g_deployment = parser.add_argument_group(
         'deployment', 'pattern deployment options')
     g_deployment.add_argument(
@@ -80,6 +116,8 @@ def main():
     if args.command == 'discover':
         nodes = discover()
         pprint(nodes)
+    elif args.command == 'command':
+        result = command(args.command, args.targets)
     elif args.command == 'deploy':
         # TODO need argument parsing here so targets can be specified in user-friendly ways
         result = deploy(args.source, args.dest)
