@@ -29,7 +29,7 @@ def firestorm_get(endpoint):
     return content
 
 
-def pixelblaze_post(endpoint, data):
+def firestorm_post(endpoint, data):
     """
     Makes a POST request to Firestorm
     @param endpoint: name of Firestorm endpoint
@@ -58,7 +58,7 @@ def deploy(from_node, to_nodes):
     # TODO need to establish target list to populate data
     # curl -v -X POST -H 'Content-Type: application/json' -d '{"from": 811451, "to": [4514378, 8703982, 9987259, 9999035, 12327866, 14165434, 15792826, 16266426]}' http://192.168.5.1/clonePrograms
     data = {}
-    resp = pixelblaze_post("clonePrograms", data)
+    resp = firestorm_post("clonePrograms", data)
     # TODO need to run /clonePrograms again and view response body
 
 
@@ -69,9 +69,10 @@ def main():
 
     g_deployment = parser.add_argument_group(
         'deployment', 'pattern deployment options')
-    g_deployment.add_argument('--source', 'node to copy patterns from')
     g_deployment.add_argument(
-        '--dest', 'node(s) to copy patterns to (empty => all)')
+        '--source', help='node to copy patterns from', default=None)
+    g_deployment.add_argument(
+        '--dest', help='node(s) to copy patterns to (empty => all)', default=None)
 
     args = parser.parse_args()
 
