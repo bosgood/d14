@@ -2,6 +2,8 @@
 
 import json
 from urllib.request import urlopen, Request
+from urllib.parse import urlencode
+from urllib.error import HTTPError
 import argparse
 from pprint import pprint
 
@@ -36,27 +38,45 @@ def firestorm_post(endpoint, data):
     @param data: POST request content body
     @return JSON-decoded response body
     """
+    json_bytes = json.dumps(data).encode('utf-8')
     req = Request(f"http://{FIRESTORM_ADDRESS}/{endpoint}",
-                  data=data,
-                  headers={'Content-Type': 'application/json'},
                   method="POST")
-    resp = urlopen(req)
-    body = resp.readlines()
-
-    # TODO need to finish POST implementation
-    import ipdb
-    ipdb.set_trace()
-
-    return body
+    req.add_header('Content-Type', 'application/json')
+    try:
+        with urlopen(req, data=json_bytes) as resp:
+            body = resp.read()
+            return body.decode('utf-8')
+    except HTTPError as err:
+        return err
 
 
 def discover():
     """
     Discovers all Pixelblaze nodes on the network
-    @return List of Pixelblaze infos
+    @return List of complete Pixelblaze infos
     """
     nodes = firestorm_get("discover")
     return nodes
+
+
+def scan():
+    """
+    Discovers all Pixelblaze nodes on the network
+    @return List of Pixelblaze name/ID pairs
+    """
+    return [
+        [n['name'], n['id']] for n in discover()
+    ]
+
+
+def scanmap():
+    """
+    Discovers all Pixelblaze nodes on the network
+    @return Map of name/ID pairs, indexed by name
+    """
+    return {
+        n['name']: n['id'] for n in discover()
+    }
 
 
 def command(cmd, targets):
@@ -84,12 +104,41 @@ def command(cmd, targets):
     return resp
 
 
-def deploy(from_node, to_nodes):
-    # TODO need to establish target list to populate data
+def pixelblaze_name_to_id(node_ids, node_id_ish):
+    """
+    Transform a Pixelblaze ID or name into an ID
+    @param node_ids: a map of Pixelblaze node IDs by name
+    @param node_id_ish: a Pixelblaze node ID or name
+    @return a Pixelblaze node ID
+    """
+    try:
+        id_num = int(node_id_ish)
+        # Valid integer => already a node ID
+        return id_num
+    except ValueError:
+        # Try to have a nicer error for node name typos, etc
+        if node_id_ish not in node_ids:
+            raise Exception(
+                f"Unrecognized Pixelblaze name or ID: {node_id_ish}")
+
+        # Not a valid integer => look up name in index
+        return node_ids[node_id_ish]
+
+
+def deploy(from_node_raw, to_nodes_raw):
+    # Transform any name-based source or target specification into its Pixelblaze ID
+    node_ids = scanmap()
+    to_nodes_ids = [pixelblaze_name_to_id(node_ids, n) for n in to_nodes_raw]
+    from_node_id = pixelblaze_name_to_id(node_ids, from_node_raw)
+
+    data = {
+        "from": from_node_id,
+        "to": to_nodes_ids,
+    }
+    # Example curl command for performing this same request
     # curl -v -X POST -H 'Content-Type: application/json' -d '{"from": 811451, "to": [4514378, 8703982, 9987259, 9999035, 12327866, 14165434, 15792826, 16266426]}' http://192.168.5.1/clonePrograms
-    data = {}
     resp = firestorm_post("clonePrograms", data)
-    # TODO need to run /clonePrograms again and view response body
+    return resp
 
 
 def main():
@@ -116,11 +165,26 @@ def main():
     if args.command == 'discover':
         nodes = discover()
         pprint(nodes)
+    elif args.command == 'scan':
+        names = scan()
+        pprint(names)
     elif args.command == 'command':
         result = command(args.command, args.targets)
     elif args.command == 'deploy':
-        # TODO need argument parsing here so targets can be specified in user-friendly ways
-        result = deploy(args.source, args.dest)
+        # Basic argument validation for program cloning
+        if not args.source:
+            raise Exception(
+                'Expected --source to be provided with a Pixelblaze ID')
+        if not args.dest:
+            raise Exception(
+                'Expected --dest to be provided with Pixelblaze IDs')
+        if args.source in args.dest:
+            raise Exception(
+                'Expected --dest not to contain the source Pixelblaze')
+
+        targets = args.dest.split(',')
+        result = deploy(args.source, targets)
+
         pprint(result)
 
 
